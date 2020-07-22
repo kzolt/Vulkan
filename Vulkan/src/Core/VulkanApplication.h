@@ -2,7 +2,9 @@
 
 #include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
+#include <glfw/glfw3native.h>
 
 #include <string>
 #include <vector>
@@ -24,10 +26,11 @@ namespace Vulkan {
 	struct QueueFamilyIndicies
 	{
 		std::optional<uint32_t> GraphicsFamily;
+		std::optional<uint32_t> PresentFamily;
 
 		bool IsComplete()
 		{
-			return GraphicsFamily.has_value();
+			return GraphicsFamily.has_value() && PresentFamily.has_value();
 		}
 	};
 
@@ -41,7 +44,7 @@ namespace Vulkan {
 
 	private:
 		// Window
-		void CreateWindow();
+		void CreateApplicationWindow();
 
 		// Validation Layers
 		bool CheckValidationLayerSupport();
@@ -61,6 +64,9 @@ namespace Vulkan {
 		// Logical Device
 		void CreateLogicalDevice();
 
+		// Vulkan Window Context
+		void CreateContext();
+
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
@@ -76,8 +82,10 @@ namespace Vulkan {
 		VkDevice m_Device;
 
 		VkQueue m_GraphicsQueue;
+		VkQueue m_PresentQueue;
 
-		// Vulkan Window
+		// Vulkan Context
+		VkSurfaceKHR m_Surface;
 	};
 
 }
