@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
 #define ENABLE_VALIDATION_LAYERS true
 
@@ -18,6 +19,16 @@ namespace Vulkan {
 
 		WindowProps()
 			: WindowTitle("Vulkan"), Width(1280), Height(720) {}
+	};
+
+	struct QueueFamilyIndicies
+	{
+		std::optional<uint32_t> GraphicsFamily;
+
+		bool IsComplete()
+		{
+			return GraphicsFamily.has_value();
+		}
 	};
 
 	class VulkanApplication
@@ -42,7 +53,13 @@ namespace Vulkan {
 
 		// Physical Devices
 		void PickPhysicalDevice();
-		bool IsDeviceSuitable(VkPhysicalDevice device);
+		int RateDeviceSuitability(VkPhysicalDevice device);
+
+		// Queue Families
+		QueueFamilyIndicies FindQueueFamilies(VkPhysicalDevice device);
+
+		// Logical Device
+		void CreateLogicalDevice();
 
 	private:
 		WindowProps m_Properties;
@@ -50,10 +67,17 @@ namespace Vulkan {
 
 		const std::vector<const char*> m_ValidationLayers = { "VK_LAYER_KHRONOS_validation" };
 
-		// Vulkan
+		// Vulkan Primitives
 		VkInstance m_Instance;
+		
 		VkDebugUtilsMessengerEXT m_DebugMessenger;
+		
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+		VkDevice m_Device;
+
+		VkQueue m_GraphicsQueue;
+
+		// Vulkan Window
 	};
 
 }

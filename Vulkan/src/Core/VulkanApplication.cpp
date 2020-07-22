@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <map>
 
 #include "glm/glm.hpp"
 
@@ -89,10 +90,15 @@ namespace Vulkan {
 
 		// Physical Devices
 		PickPhysicalDevice();
+
+		// Logical Device
+		CreateLogicalDevice();
 	}
 
 	VulkanApplication::~VulkanApplication()
 	{
+		vkDestroyDevice(m_Device, nullptr);
+
 		if (ENABLE_VALIDATION_LAYERS)
 			DestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
 		vkDestroyInstance(m_Instance, nullptr);
@@ -185,28 +191,106 @@ namespace Vulkan {
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(m_Instance, &deviceCount, devices.data());
 
+		// Use an ordered map to automatically sort candidates by increasing score
+		std::multimap<int, VkPhysicalDevice> candidates;
+
 		for (const auto& device : devices)
 		{
-			if (IsDeviceSuitable(device))
-			{
-				m_PhysicalDevice = device;
-				break;
-			}
+			int score = RateDeviceSuitability(device);
+			candidates.insert(std::make_pair(score, device));
 		}
 
-		if (m_PhysicalDevice == VK_NULL_HANDLE)
+		// Check if the best candidate is suitable at all
+		if (candidates.rbegin()->first > 0)
+			m_PhysicalDevice = candidates.rbegin()->second;
+		else
 			std::cout << "Failed to find a suitable GPU!" << std::endl;
 	}
 
-	bool VulkanApplication::IsDeviceSuitable(VkPhysicalDevice device)
+	int VulkanApplication::RateDeviceSuitability(VkPhysicalDevice device)
 	{
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
 		VkPhysicalDeviceFeatures deviceFeatures;
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+		
+		int score = 0;
 
-		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader;
+		// Discrete GPUs have a significant performance advantage
+		if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+			score += 1000;
+
+		// Maximum possible size of textures affects graphics quality
+		score += deviceProperties.limits.maxImageDimension2D;
+
+		// Application can't function without geometry shaders
+		if (!deviceFeatures.geometryShader)
+			return 0;
+
+		return score;
+	}
+
+	QueueFamilyIndicies VulkanApplication::FindQueueFamilies(VkPhysicalDevice device)
+	{
+		QueueFamilyIndicies indicies;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies)
+		{
+			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				indicies.GraphicsFamily = i;
+
+			if (indicies.IsComplete())
+				break;
+
+			i++;
+		}
+
+		return indicies;
+	}
+
+	void VulkanApplication::CreateLogicalDevice()
+	{
+		QueueFamilyIndicies indices = FindQueueFamilies(m_PhysicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.GraphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+		
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+
+		createInfo.pEnabledFeatures = &deviceFeatures;
+		createInfo.enabledExtensionCount = 0;
+
+		if (ENABLE_VALIDATION_LAYERS)
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t>(m_ValidationLayers.size());
+			createInfo.ppEnabledLayerNames = m_ValidationLayers.data();
+		}
+		else
+		{
+			createInfo.enabledLayerCount = 0;
+		}
+
+		if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS)
+			std::cout << "Failed to create logical device!" << std::endl;
+
+		vkGetDeviceQueue(m_Device, indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
 	}
 
 	void VulkanApplication::Run()
