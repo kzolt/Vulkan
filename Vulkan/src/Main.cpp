@@ -1,10 +1,11 @@
 #include <iostream>
-#include <string>
-
-#include <vulkan/vulkan.h>
-#include <glfw/glfw3.h>
+#include "Core/VulkanApplication.h"
 
 int main()
 {
+	Vulkan::VulkanApplication* app = new Vulkan::VulkanApplication();
 
+	app->Run();
+
+	delete app;
 }
