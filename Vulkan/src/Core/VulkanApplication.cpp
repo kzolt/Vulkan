@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <algorithm>
+#include <fstream>
 
 #include <vulkan/vulkan_win32.h>
 
@@ -526,12 +527,70 @@ namespace Vulkan {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
+	// Graphics Pipeline Helpers
+	//////////////////////////////////////////////////////////////////////////////////
+
+	static std::vector<char> ReadFile(const std::string& filepath)
+	{
+		std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+
+		if (!file.is_open())
+		{
+			std::cout << "Failed to open file: " << filepath << std::endl;
+			__debugbreak();
+		}
+
+		size_t fileSize = (size_t)file.tellg();
+		std::vector<char> buffer(fileSize);
+
+		file.seekg(0);
+		file.read(buffer.data(), fileSize);
+		file.close();
+
+		return buffer;
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////
 	// Graphics Pipeline
 	//////////////////////////////////////////////////////////////////////////////////
 
+	VkShaderModule VulkanApplication::CreateShaderModule(const std::vector<char>& source)
+	{
+		VkShaderModuleCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = source.size();
+		createInfo.pCode = reinterpret_cast<const uint32_t*>(source.data());
+
+		VkShaderModule shaderModule;
+		if (vkCreateShaderModule(m_Device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+			std::cout << "Failed to create shader module!" << std::endl;
+	}
+
 	void VulkanApplication::CreateGraphicsPipeline()
 	{
+		auto vertexShader = ReadFile("assets/shaders/vert.spv");
+		auto fragmentShader = ReadFile("assets/shaders/frag.spv");
 
+		VkShaderModule vertexShaderModule = CreateShaderModule(vertexShader);
+		VkShaderModule fragmentShaderModule = CreateShaderModule(fragmentShader);
+
+		VkPipelineShaderStageCreateInfo vertexShaderStageInfo{};
+		vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertexShaderStageInfo.module = vertexShaderModule;
+		vertexShaderStageInfo.pName = "main";
+
+		VkPipelineShaderStageCreateInfo fragmentShaderStageInfo{};
+		fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		fragmentShaderStageInfo.module = fragmentShaderModule;
+		fragmentShaderStageInfo.pName = "main";
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
+
+		// Cleanup
+		vkDestroyShaderModule(m_Device, vertexShaderModule, nullptr);
+		vkDestroyShaderModule(m_Device, fragmentShaderModule, nullptr);
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////

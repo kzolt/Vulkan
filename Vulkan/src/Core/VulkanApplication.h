@@ -101,6 +101,8 @@ namespace Vulkan {
 		void CreateImageViews();
 
 		// Graphics Pipeline
+		VkShaderModule CreateShaderModule(const std::vector<char>& source);
+
 		void CreateGraphicsPipeline();
 
 	private:
