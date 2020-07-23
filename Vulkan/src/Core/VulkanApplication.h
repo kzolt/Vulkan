@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -34,6 +33,13 @@ namespace Vulkan {
 		}
 	};
 
+	struct SwapChainSupportDetails
+	{
+		VkSurfaceCapabilitiesKHR Capabilities;
+		std::vector<VkSurfaceFormatKHR> Formats;
+		std::vector<VkPresentModeKHR> PresentModes;
+	};
+
 	class VulkanApplication
 	{
 	public:
@@ -64,14 +70,23 @@ namespace Vulkan {
 		// Logical Device
 		void CreateLogicalDevice();
 
-		// Vulkan Window Context
-		void CreateContext();
+		// Extensions
+		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+
+		// Swapchain
+		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+		VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+		VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+		VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+		
+		void CreateSwapchain();
 
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
 
 		const std::vector<const char*> m_ValidationLayers = { "VK_LAYER_KHRONOS_validation" };
+		const std::vector<const char*> m_DeviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 		// Vulkan Primitives
 		VkInstance m_Instance;
@@ -86,6 +101,11 @@ namespace Vulkan {
 
 		// Vulkan Context
 		VkSurfaceKHR m_Surface;
+
+		VkSwapchainKHR m_Swapchain;
+		std::vector<VkImage> m_SwapchainImages;
+		VkFormat m_SwapchainImageFormat;
+		VkExtent2D m_SwapchainExtent;
 	};
 
 }
