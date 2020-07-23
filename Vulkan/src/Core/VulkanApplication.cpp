@@ -564,6 +564,8 @@ namespace Vulkan {
 		VkShaderModule shaderModule;
 		if (vkCreateShaderModule(m_Device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
 			std::cout << "Failed to create shader module!" << std::endl;
+
+		return shaderModule;
 	}
 
 	void VulkanApplication::CreateGraphicsPipeline()
