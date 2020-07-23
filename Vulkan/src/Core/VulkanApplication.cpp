@@ -39,7 +39,7 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 namespace Vulkan {	
 
 	//////////////////////////////////////////////////////////////////////////////////
-	// Initalization and Destruction
+	// Initialization and Destruction
 	//////////////////////////////////////////////////////////////////////////////////
 
 	VulkanApplication::VulkanApplication(const WindowProps& props)
@@ -101,6 +101,9 @@ namespace Vulkan {
 
 		// Swapchain
 		CreateSwapchain();
+
+		// Pipline
+		CreateGraphicsPipeline();
 	}
 
 	VulkanApplication::~VulkanApplication()
@@ -520,6 +523,15 @@ namespace Vulkan {
 			if (vkCreateImageView(m_Device, &createInfo, nullptr, &m_SwapchainImageViews[i]) != VK_SUCCESS)
 				std::cout << "Failed to create image views! [" << i << "]" << std::endl;
 		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////
+	// Graphics Pipeline
+	//////////////////////////////////////////////////////////////////////////////////
+
+	void VulkanApplication::CreateGraphicsPipeline()
+	{
+
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
