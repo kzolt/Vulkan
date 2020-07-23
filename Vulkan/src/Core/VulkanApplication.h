@@ -81,6 +81,9 @@ namespace Vulkan {
 		
 		void CreateSwapchain();
 
+		// Image Views
+		void CreateImageViews();
+
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
@@ -106,6 +109,8 @@ namespace Vulkan {
 		std::vector<VkImage> m_SwapchainImages;
 		VkFormat m_SwapchainImageFormat;
 		VkExtent2D m_SwapchainExtent;
+		
+		std::vector<VkImageView> m_SwapchainImageViews;
 	};
 
 }
