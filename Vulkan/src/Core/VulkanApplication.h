@@ -109,6 +109,10 @@ namespace Vulkan {
 		// Framebuffers
 		void CreateFrambuffer();
 
+		// Command Buffer
+		void CreateCommandPool();
+		void CreateCommandBuffers();
+
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
@@ -143,6 +147,9 @@ namespace Vulkan {
 		VkRenderPass m_RenderPass;
 
 		std::vector<VkFramebuffer> m_SwapchainFramebuffers;
+
+		VkCommandPool m_CommandPool;
+		std::vector<VkCommandBuffer> m_CommandBuffers;
 		
 	};
 

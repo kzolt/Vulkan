@@ -104,6 +104,9 @@ namespace Vulkan {
 		// Swapchain
 		CreateSwapchain();
 
+		// Image Views
+		CreateImageViews();
+
 		// Render pass
 		CreateRenderPass();
 
@@ -112,10 +115,16 @@ namespace Vulkan {
 
 		// Framebuffers
 		CreateFrambuffer();
+
+		// Command Buffers
+		CreateCommandPool();
+		CreateCommandBuffers();
 	}
 
 	VulkanApplication::~VulkanApplication()
 	{
+		vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+
 		for (auto framebuffer : m_SwapchainFramebuffers)
 			vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
 
@@ -704,6 +713,7 @@ namespace Vulkan {
 		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineInfo.stageCount = 2;
 		pipelineInfo.pStages = shaderStages;
+		
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pViewportState = &viewportState;
@@ -711,7 +721,8 @@ namespace Vulkan {
 		pipelineInfo.pMultisampleState = &multisampling;
 		pipelineInfo.pDepthStencilState = nullptr;
 		pipelineInfo.pColorBlendState = &colorBlending;
-		pipelineInfo.pDynamicState = &dynamicState;
+		pipelineInfo.pDynamicState = nullptr;
+
 		pipelineInfo.layout = m_PiplineLayout;
 		pipelineInfo.renderPass = m_RenderPass;
 		pipelineInfo.subpass = 0;
@@ -785,6 +796,67 @@ namespace Vulkan {
 			
 			if (vkCreateFramebuffer(m_Device, &framebufferInfo, nullptr, &m_SwapchainFramebuffers[i]) != VK_SUCCESS)
 				std::cout << "Failed to create framebuffer!" << std::endl;
+		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////
+	// Command Buffers
+	//////////////////////////////////////////////////////////////////////////////////
+
+	void VulkanApplication::CreateCommandPool()
+	{
+		QueueFamilyIndicies queueFamilyIndices = FindQueueFamilies(m_PhysicalDevice);
+
+		VkCommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
+		poolInfo.flags = 0;
+
+		if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
+			std::cout << "Failed to create command pool!" << std::endl;
+	}
+
+	void VulkanApplication::CreateCommandBuffers()
+	{
+		m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
+
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = m_CommandPool;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
+
+		if (vkAllocateCommandBuffers(m_Device, &allocInfo, m_CommandBuffers.data()) != VK_SUCCESS)
+			std::cout << "Failed to allocate command buffers!" << std::endl;
+
+		for (size_t i = 0; i < m_CommandBuffers.size(); i++)
+		{
+			VkCommandBufferBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+			if (vkBeginCommandBuffer(m_CommandBuffers[i], &beginInfo) != VK_SUCCESS)
+				std::cout << "Failed to begin recording command!" << std::endl;
+
+			VkRenderPassBeginInfo renderPassInfo{};
+			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass = m_RenderPass;
+			renderPassInfo.framebuffer = m_SwapchainFramebuffers[i];
+			renderPassInfo.renderArea.offset = { 0, 0 };
+			renderPassInfo.renderArea.extent = m_SwapchainExtent;
+
+			VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+			renderPassInfo.clearValueCount = 1;
+			renderPassInfo.pClearValues = &clearColor;
+
+			vkCmdBeginRenderPass(m_CommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
+			
+			vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+
+			vkCmdEndRenderPass(m_CommandBuffers[i]);
+
+			if (vkEndCommandBuffer(m_CommandBuffers[i]) != VK_SUCCESS)
+				std::cout << "Failed to record command buffer!" << std::endl;
 		}
 	}
 
