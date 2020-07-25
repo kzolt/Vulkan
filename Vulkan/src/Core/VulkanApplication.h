@@ -106,6 +106,9 @@ namespace Vulkan {
 		void CreateGraphicsPipeline();
 		void CreateRenderPass();
 
+		// Framebuffers
+		void CreateFrambuffer();
+
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
@@ -138,6 +141,9 @@ namespace Vulkan {
 		VkPipelineLayout m_PiplineLayout;
 		VkPipeline m_GraphicsPipeline;
 		VkRenderPass m_RenderPass;
+
+		std::vector<VkFramebuffer> m_SwapchainFramebuffers;
+		
 	};
 
 }
