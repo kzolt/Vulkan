@@ -104,6 +104,7 @@ namespace Vulkan {
 		VkShaderModule CreateShaderModule(const std::vector<char>& source);
 
 		void CreateGraphicsPipeline();
+		void CreateRenderPass();
 
 	private:
 		WindowProps m_Properties;
@@ -132,6 +133,11 @@ namespace Vulkan {
 		VkExtent2D m_SwapchainExtent;
 		
 		std::vector<VkImageView> m_SwapchainImageViews;
+
+		// Vulkan Pipeline
+		VkPipelineLayout m_PiplineLayout;
+		VkPipeline m_GraphicsPipeline;
+		VkRenderPass m_RenderPass;
 	};
 
 }
