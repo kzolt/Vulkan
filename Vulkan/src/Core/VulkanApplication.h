@@ -10,6 +10,7 @@
 #include <optional>
 
 #define ENABLE_VALIDATION_LAYERS true
+#define MAX_FRAMES_IN_FLIGHT 2
 
 namespace Vulkan {
 
@@ -113,9 +114,16 @@ namespace Vulkan {
 		void CreateCommandPool();
 		void CreateCommandBuffers();
 
+		// Rendering
+		void CreateSyncObjects();
+
+		void Present();
+
 	private:
 		WindowProps m_Properties;
 		GLFWwindow* m_Window;
+
+		size_t m_CurrentFrame = 0;
 
 		const std::vector<const char*> m_ValidationLayers = { "VK_LAYER_KHRONOS_validation" };
 		const std::vector<const char*> m_DeviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -151,6 +159,12 @@ namespace Vulkan {
 		VkCommandPool m_CommandPool;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
 		
+		// Vulkan Rendering
+		std::vector<VkSemaphore> m_ImageAvailableSemaphore;
+		std::vector<VkSemaphore> m_RenderFinishedSemaphore;
+
+		std::vector<VkFence> m_InFlightFences;
+		std::vector<VkFence> m_ImagesInFlight;
 	};
 
 }
