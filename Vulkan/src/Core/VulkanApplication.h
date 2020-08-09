@@ -12,6 +12,8 @@
 #define ENABLE_VALIDATION_LAYERS true
 #define MAX_FRAMES_IN_FLIGHT 2
 
+static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
+
 namespace Vulkan {
 
 	//////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +99,8 @@ namespace Vulkan {
 		VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 		
 		void CreateSwapchain();
+		void RecreateSwapchain();
+		void CleanupSwapchain();
 
 		// Image Views
 		void CreateImageViews();
@@ -118,6 +122,9 @@ namespace Vulkan {
 		void CreateSyncObjects();
 
 		void Present();
+
+	public:
+		bool framebufferResized = false;
 
 	private:
 		WindowProps m_Properties;

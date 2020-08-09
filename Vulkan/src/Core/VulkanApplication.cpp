@@ -7,8 +7,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include <vulkan/vulkan_win32.h>
-
 #include "glm/glm.hpp"
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +84,7 @@ namespace Vulkan {
 		}
 
 		if (vkCreateInstance(&createInfo, nullptr, &m_Instance) != VK_SUCCESS)
-			std::cout << "Failed to create vulkan instance" << std::endl;
+			std::cout << "Failed to create Vulkan instance" << std::endl;
 
 		// Debug Messenger
 		SetupDebugMessenger();
@@ -120,12 +118,14 @@ namespace Vulkan {
 		CreateCommandPool();
 		CreateCommandBuffers();
 
-		// Semaphores
+		// Semaphores and Fences
 		CreateSyncObjects();
 	}
 
 	VulkanApplication::~VulkanApplication()
 	{
+		CleanupSwapchain();
+
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			vkDestroySemaphore(m_Device, m_RenderFinishedSemaphore[i], nullptr);
@@ -135,17 +135,6 @@ namespace Vulkan {
 
 		vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 
-		for (auto framebuffer : m_SwapchainFramebuffers)
-			vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
-
-		vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
-		vkDestroyPipelineLayout(m_Device, m_PiplineLayout, nullptr);
-		vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
-
-		for (auto imageView : m_SwapchainImageViews)
-			vkDestroyImageView(m_Device, imageView, nullptr);
-
-		vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
 		vkDestroyDevice(m_Device, nullptr);
 
 		if (ENABLE_VALIDATION_LAYERS)
@@ -166,6 +155,12 @@ namespace Vulkan {
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 		m_Window = glfwCreateWindow(m_Properties.Width, m_Properties.Height, m_Properties.WindowTitle.c_str(), NULL, NULL);
+		glfwSetWindowUserPointer(m_Window, this);
+		glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
+			{
+				auto app = reinterpret_cast<VulkanApplication*>(glfwGetWindowUserPointer(window));
+				app->framebufferResized = true;
+			});
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
@@ -461,9 +456,17 @@ namespace Vulkan {
 		if (capabilities.currentExtent.width != UINT32_MAX)
 			return capabilities.currentExtent;
 
-		VkExtent2D actualExtent = { m_Properties.Width, m_Properties.Height };
-		actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
-		actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
+		int width, height;
+		glfwGetFramebufferSize(m_Window, &width, &height);
+
+		//VkExtent2D actualExtent = { m_Properties.Width, m_Properties.Height };
+		//actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
+		//actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
+
+		VkExtent2D actualExtent = {
+			static_cast<uint32_t>(width),
+			static_cast<uint32_t>(height)
+		};
 
 		return actualExtent;
 	}
@@ -524,6 +527,45 @@ namespace Vulkan {
 
 		m_SwapchainImageFormat = surfaceFormat.format;
 		m_SwapchainExtent = extent;
+	}
+
+	void VulkanApplication::RecreateSwapchain()
+	{
+		int width = 0, height = 0;
+		glfwGetFramebufferSize(m_Window, &width, &height);
+		while (width == 0 || height == 0)
+		{
+			glfwGetFramebufferSize(m_Window, &width, &height);
+			glfwWaitEvents();
+		}
+		
+		vkDeviceWaitIdle(m_Device);
+
+		CleanupSwapchain();
+
+		CreateSwapchain();
+		CreateImageViews();
+		CreateRenderPass();
+		CreateGraphicsPipeline();
+		CreateFrambuffer();
+		CreateCommandBuffers();
+	}
+
+	void VulkanApplication::CleanupSwapchain()
+	{
+		for (auto framebuffer : m_SwapchainFramebuffers)
+			vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
+
+		vkFreeCommandBuffers(m_Device, m_CommandPool, static_cast<uint32_t>(m_CommandBuffers.size()), m_CommandBuffers.data());
+
+		vkDestroyPipeline(m_Device, m_GraphicsPipeline, nullptr);
+		vkDestroyPipelineLayout(m_Device, m_PiplineLayout, nullptr);
+		vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
+
+		for (auto imageView : m_SwapchainImageViews)
+			vkDestroyImageView(m_Device, imageView, nullptr);
+
+		vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
@@ -914,7 +956,17 @@ namespace Vulkan {
 
 		// Rendering
 		uint32_t imageIndex;
-		vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphore[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphore[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+
+		if (result == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			RecreateSwapchain();
+			return;
+		}
+		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		{
+			std::cout << "Failed to acquire swapchain image!" << std::endl;
+		}
 
 		if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
 			vkWaitForFences(m_Device, 1, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -955,7 +1007,17 @@ namespace Vulkan {
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr;
 
-		vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+		result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
+		{
+			framebufferResized = false;
+			RecreateSwapchain();
+		}
+		else if (result != VK_SUCCESS)
+		{
+			std::cout << "Failed to present swapchain image!" << std::endl;
+		}
 
 		m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
