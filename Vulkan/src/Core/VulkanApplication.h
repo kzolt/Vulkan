@@ -7,14 +7,52 @@
 
 #include <string>
 #include <vector>
+#include <array>
 #include <optional>
+
+#include <glm/glm.hpp>
 
 #define ENABLE_VALIDATION_LAYERS true
 #define MAX_FRAMES_IN_FLIGHT 2
 
-static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
-
 namespace Vulkan {
+
+	//////////////////////////////////////////////////////////////////////////////////
+// Data Structures
+//////////////////////////////////////////////////////////////////////////////////
+
+	struct Vertex
+	{
+		glm::vec2 Position;
+		glm::vec3 Color;
+
+		static VkVertexInputBindingDescription GetBindingDescription()
+		{
+			VkVertexInputBindingDescription bindingDescription{};
+			bindingDescription.binding = 0;
+			bindingDescription.stride = sizeof(Vertex);
+			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+			return bindingDescription;
+		}
+
+		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions()
+		{
+			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
+			attributeDescriptions[0].binding = 0;
+			attributeDescriptions[0].location = 0;
+			attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+			attributeDescriptions[0].offset = offsetof(Vertex, Position);
+
+			attributeDescriptions[1].binding = 0;
+			attributeDescriptions[1].location = 1;
+			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[1].offset = offsetof(Vertex, Color);
+
+			return attributeDescriptions;
+		}
+	};
 
 	//////////////////////////////////////////////////////////////////////////////////
 	// Window Properties
@@ -118,6 +156,10 @@ namespace Vulkan {
 		void CreateCommandPool();
 		void CreateCommandBuffers();
 
+		// Vertex Buffers
+		void CreateVertexBuffer();
+		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
 		// Rendering
 		void CreateSyncObjects();
 
@@ -172,6 +214,17 @@ namespace Vulkan {
 
 		std::vector<VkFence> m_InFlightFences;
 		std::vector<VkFence> m_ImagesInFlight;
+
+		// Vulkan Vertex Buffer
+		VkBuffer m_VertexBuffer;
+		VkDeviceMemory m_VertexBufferMemory;
+
+	private:
+		const std::vector<Vertex> m_Verticies = {
+			{ { 0.0f, -0.5f}, {1.0f, 0.0f, 0.0f} },
+			{ { 0.5f,  0.5f}, {0.0f, 1.0f, 0.0f} },
+			{ {-0.5f,  0.5f}, {0.0f, 0.0f, 1.0f} }
+		};
 	};
 
 }

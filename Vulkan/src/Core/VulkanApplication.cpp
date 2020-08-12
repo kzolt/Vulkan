@@ -114,8 +114,13 @@ namespace Vulkan {
 		// Framebuffers
 		CreateFrambuffer();
 
-		// Command Buffers
+		// Command Pools
 		CreateCommandPool();
+
+		// Vertex Buffer
+		CreateVertexBuffer();
+		
+		// Command Buffers
 		CreateCommandBuffers();
 
 		// Semaphores and Fences
@@ -125,6 +130,9 @@ namespace Vulkan {
 	VulkanApplication::~VulkanApplication()
 	{
 		CleanupSwapchain();
+
+		vkDestroyBuffer(m_Device, m_VertexBuffer, nullptr);
+		vkFreeMemory(m_Device, m_VertexBufferMemory, nullptr);
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -666,13 +674,17 @@ namespace Vulkan {
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderStageInfo, fragmentShaderStageInfo };
 
+
 		// Vertex Input
+		auto bindingDescription = Vertex::GetBindingDescription();
+		auto attributeDescription = Vertex::GetAttributeDescriptions();
+
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInputInfo.vertexBindingDescriptionCount = 0;
-		vertexInputInfo.pVertexBindingDescriptions = nullptr;
-		vertexInputInfo.pVertexAttributeDescriptions = 0;
-		vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
+		vertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
 
 		// Input Assembly
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -911,16 +923,70 @@ namespace Vulkan {
 			renderPassInfo.clearValueCount = 1;
 			renderPassInfo.pClearValues = &clearColor;
 
+			// Draw Call
 			vkCmdBeginRenderPass(m_CommandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_GraphicsPipeline);
-			
-			vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+
+			VkBuffer vertexBuffers[] = {m_VertexBuffer};
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(m_CommandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+			vkCmdDraw(m_CommandBuffers[i], static_cast<uint32_t>(m_Verticies.size()), 1, 0, 0);
 
 			vkCmdEndRenderPass(m_CommandBuffers[i]);
 
 			if (vkEndCommandBuffer(m_CommandBuffers[i]) != VK_SUCCESS)
 				std::cout << "Failed to record command buffer!" << std::endl;
 		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////
+	// Vertex Buffers
+	//////////////////////////////////////////////////////////////////////////////////
+
+	void VulkanApplication::CreateVertexBuffer()
+	{
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = sizeof(m_Verticies[0]) * m_Verticies.size();
+		bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateBuffer(m_Device, &bufferInfo, nullptr, &m_VertexBuffer) != VK_SUCCESS)
+			std::cout << "Failed to create vertex buffer!" << std::endl;
+
+		VkMemoryRequirements memReq;
+		vkGetBufferMemoryRequirements(m_Device, m_VertexBuffer, &memReq);
+
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memReq.size;
+		allocInfo.memoryTypeIndex = FindMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		if (vkAllocateMemory(m_Device, &allocInfo, nullptr, &m_VertexBufferMemory) != VK_SUCCESS)
+			std::cout << "Failed to allocate vertex buffer memory!" << std::endl;
+
+		vkBindBufferMemory(m_Device, m_VertexBuffer, m_VertexBufferMemory, 0);
+
+		void* data;
+		vkMapMemory(m_Device, m_VertexBufferMemory, 0, bufferInfo.size, 0, &data);
+		memcpy(data, m_Verticies.data(), (size_t)bufferInfo.size);
+		vkUnmapMemory(m_Device, m_VertexBufferMemory);
+	}
+
+	uint32_t VulkanApplication::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+	{
+		VkPhysicalDeviceMemoryProperties memProp;
+		vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &memProp);
+
+		for (uint32_t i = 0; i < memProp.memoryTypeCount; i++)
+		{
+			if (typeFilter & (1 << i) && (memProp.memoryTypes[i].propertyFlags & properties) == properties)
+				return i;
+		}
+
+		std::cout << "Failed to find suitable memory type!" << std::endl;
+		return 0;
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
